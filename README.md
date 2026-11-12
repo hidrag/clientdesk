@@ -1,580 +1,370 @@
-# ClientDesk
+# More Supermarket Mega
 
-ClientDesk is a beginner-friendly **Customer Database Management System** built with **Python, MySQL, and Streamlit**.
-
-The project is designed as a practical learning project to combine Python programming, SQL, database connectivity, validation, CRUD operations, authentication, and Streamlit application development into one complete application.
+A complete CLI-based supermarket billing application built with Python and PostgreSQL.
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
-ClientDesk allows users to:
+More Supermarket Mega is a QR-code-based supermarket billing system designed as a Python learning and portfolio project. It covers database connectivity, customer management, product inventory, QR code generation and scanning, transactional billing, and receipt generation — all from the terminal.
 
-- Create an account
-- Log in securely
-- Store customer information
-- Search customer records
-- Add new customers
-- Update customer information
-- Delete customer records
-- Validate user input before storing data
-- Prevent duplicate usernames and email addresses
+### Objectives
 
-The project is being developed incrementally, with each feature implemented and tested before moving to the next stage.
+- Apply Python programming fundamentals (functions, modules, error handling, Decimal arithmetic).
+- Work with PostgreSQL for persistent data storage.
+- Use parameterized queries and transactions for data integrity.
+- Integrate QR code generation and webcam scanning.
+- Build a complete CLI workflow from customer identification through bill finalisation.
 
 ---
 
-## 🛠️ Technology Stack
+## Key Features
+
+| Feature | Description |
+|---|---|
+| Customer registration | Collect name, address and phone; validate; prevent duplicate phone numbers |
+| Customer lookup | Find customers by phone number |
+| Product catalogue | View all products with ID, name, price and stock |
+| QR code PDF generation | Generate a printable A4 PDF with QR codes for every product |
+| QR code scanning | Scan product QR codes via webcam (OpenCV); manual ID fallback |
+| Billing | Build a cart, lock inventory, save bill summary + details atomically |
+| Receipt generation | Display a formatted receipt and save it as a `.txt` file |
+| Inventory deduction | Stock is decremented only after a successful bill |
+| Transaction safety | Failed bills roll back completely — no partial inserts or stock changes |
+
+---
+
+## Technology Stack
 
 | Technology | Purpose |
 |---|---|
-| Python | Application logic |
-| Streamlit | Web interface |
-| MySQL 8 | Database |
-| mysql-connector-python | Python → MySQL connection |
-| python-dotenv | Environment variable management |
-| PyCharm | Development IDE |
-| MySQL Workbench | Database management |
-| Git / GitHub | Version control |
+| Python 3.14 | Application logic |
+| PostgreSQL 18 | Database (hosted on Neon) |
+| Psycopg 3 | Python → PostgreSQL driver |
+| OpenCV (`opencv-python`) | Webcam QR scanning |
+| `qrcode[pil]` | QR code image generation |
+| ReportLab (`reportlab`) | PDF generation for product labels |
+| `python-dotenv` | Environment variable management |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-```text
+```
 User
   ↓
-Streamlit Interface
+CLI Menu (main.py)
   ↓
-Input Validation
-  ↓
-Python Database Functions
-  ↓
-MySQL Database
+┌─── modules/ ──────────────────┐
+│  db_connection.py  → PostgreSQL │
+│  customer.py       → CRUD ops   │
+│  product.py        → queries    │
+│  billing.py        → tx logic   │
+│  receipt.py        → formatting │
+│  qr_generator.py   → PDF        │
+│  qr_scanner.py     → webcam     │
+│  validation.py     → input      │
+└─────────────────────────────────┘
 ```
 
-The project intentionally avoids unnecessary frameworks and advanced architecture in V1.
+### Folder Structure
 
-No Django, Flask, FastAPI, SQLAlchemy, JWT, Redis, or Docker are required for V1.
-
----
-
-## 📂 Project Structure
-
-```text
+```
 ClientDesk/
-│
-├── .venv/
-├── .env
+├── main.py                   # CLI entry point
+├── modules/
+│   ├── __init__.py
+│   ├── billing.py
+│   ├── customer.py
+│   ├── db_connection.py
+│   ├── product.py
+│   ├── qr_generator.py
+│   ├── qr_scanner.py
+│   ├── receipt.py
+│   └── validation.py
+├── database/
+│   ├── 01_create_tables.sql
+│   └── 02_insert_products.sql
+├── generated/                # Output directory (PDFs, receipts)
+├── tests/                    # Test scripts
+├── .env                      # (your local credentials, not committed)
 ├── .env.example
-├── .gitignore
-├── app.py
-├── database.py
-├── validation.py
 ├── requirements.txt
-├── README.md
-│
-└── sql/
-    └── schema.sql
+└── README.md
 ```
-
-### File Responsibilities
-
-**`app.py`**  
-Contains the Streamlit user interface and application flow.
-
-**`database.py`**  
-Contains functions responsible for communicating with MySQL, including connections, inserts, selects, duplicate checks, updates, and deletes.
-
-**`validation.py`**  
-Contains input validation functions for names, addresses, phone numbers, usernames, emails, and passwords.
-
-**`.env`**  
-Contains local database credentials. This file must **never be committed to GitHub**.
-
-**`.env.example`**  
-Contains the structure of required environment variables without exposing real credentials.
-
-**`sql/schema.sql`**  
-Contains database and table creation SQL.
 
 ---
 
-# 🗄️ Database
+## Database Schema
 
-## Database
+Four tables:
 
-```text
-clientdesk
-```
+### `cust_details`
 
-## Table
-
-```text
-cust_details
-```
-
-### Current Schema
-
-```sql
-CREATE TABLE cust_details (
-    cust_id INT PRIMARY KEY AUTO_INCREMENT,
-    full_name VARCHAR(150) NOT NULL,
-    address VARCHAR(500) NOT NULL,
-    phone_number VARCHAR(10) NOT NULL,
-    user_id VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL
-);
-```
-
-### Columns
-
-| Column | Type | Description |
+| Column | Type | Notes |
 |---|---|---|
-| `cust_id` | INT | Primary key |
-| `full_name` | VARCHAR(150) | Customer name |
-| `address` | VARCHAR(500) | Customer address |
-| `phone_number` | VARCHAR(10) | 10-digit phone number |
-| `user_id` | VARCHAR(100) | Unique username |
-| `email` | VARCHAR(255) | Unique email |
-| `password` | VARCHAR(255) | Hashed password |
+| `cust_id` | INTEGER (PK) | `GENERATED ALWAYS AS IDENTITY`, starts at 1000 |
+| `full_name` | VARCHAR(200) | NOT NULL, min 3 chars |
+| `address` | VARCHAR(500) | NOT NULL |
+| `phone_number` | VARCHAR(15) | UNIQUE, NOT NULL |
+
+### `product_details`
+
+| Column | Type | Notes |
+|---|---|---|
+| `p_id` | INTEGER (PK) | `GENERATED ALWAYS AS IDENTITY` |
+| `p_name` | VARCHAR(200) | UNIQUE, NOT NULL |
+| `p_price` | NUMERIC(10,2) | NOT NULL, >= 0 |
+| `stock_on_hand` | INTEGER | NOT NULL DEFAULT 0, >= 0 |
+
+### `bill_summary_tb`
+
+| Column | Type | Notes |
+|---|---|---|
+| `bill_id` | INTEGER (PK) | `GENERATED ALWAYS AS IDENTITY` |
+| `c_id` | INTEGER | FK → `cust_details.cust_id` |
+| `full_name` | VARCHAR(200) | Denormalised customer name |
+| `total_bill_value` | NUMERIC(10,2) | NOT NULL, >= 0 |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+### `bill_details`
+
+| Column | Type | Notes |
+|---|---|---|
+| `sl_no` | INTEGER (PK) | `GENERATED ALWAYS AS IDENTITY` |
+| `bill_id` | INTEGER | FK → `bill_summary_tb.bill_id` |
+| `c_id` | INTEGER | FK → `cust_details.cust_id` |
+| `c_name` | VARCHAR(200) | Denormalised |
+| `p_id` | INTEGER | FK → `product_details.p_id` |
+| `p_name` | VARCHAR(200) | Denormalised |
+| `p_price` | NUMERIC(10,2) | Snapshot at sale time |
+| `quantity` | INTEGER | > 0 |
+| `total_bill_amount` | NUMERIC(10,2) | >= 0 |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+Indexes exist on `bill_summary_tb(c_id)`, `bill_details(bill_id)` and `bill_details(p_id)`.
 
 ---
 
-# 🔐 Validation Rules
+## Setup
 
-ClientDesk performs validation before data reaches the database.
+### Prerequisites
 
-### Full Name
+- Python 3.12+
+- A PostgreSQL database (local or [Neon](https://neon.tech))
+- Webcam (optional — manual product ID entry works without it)
 
-- Required
-- Minimum 2 characters
-- Maximum 150 characters
-- Leading/trailing whitespace removed
-
-### Address
-
-- Required
-- Maximum 500 characters
-- Leading/trailing whitespace removed
-
-### Phone Number
-
-- Required
-- Exactly 10 digits
-- Digits only
-- No `+91`
-- No spaces
-- No hyphens
-- No letters
-
-Examples:
-
-```text
-9876543210     ✓
-+919876543210  ✗
-98765 43210    ✗
-98765-43210    ✗
-987654321      ✗
-98765432101    ✗
-```
-
-### Username
-
-- Required
-- Minimum 4 characters
-- Maximum 100 characters
-- No spaces
-- Must be unique
-
-### Email
-
-- Required
-- Converted to lowercase
-- Basic email format validation
-- Maximum 255 characters
-- Must be unique
-
-### Password
-
-- Required
-- Minimum 8 characters
-- Maximum 128 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-
-### Confirm Password
-
-Must match the original password.
-
----
-
-# 🔑 Authentication
-
-ClientDesk uses the customer table for the initial V1 authentication system.
-
-The first registered customer becomes the first application user.
-
-Passwords should **never be stored as plaintext**.
-
-Registration flow:
-
-```text
-Registration Form
-       ↓
-Input Validation
-       ↓
-Username / Email Duplicate Check
-       ↓
-Password Hashing
-       ↓
-Database Insert
-       ↓
-Registration Successful
-```
-
----
-
-# ⚙️ Local Setup
-
-## 1. Clone the Repository
+### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd ClientDesk
 ```
 
-## 2. Create a Virtual Environment
+### 2. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate it on Windows:
+Activate it:
 
-```bash
-.venv\Scripts\activate
-```
+- **Windows:** `.venv\Scripts\activate`
+- **macOS/Linux:** `source .venv/bin/activate`
 
-## 3. Install Dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Main dependencies:
+### 4. Configure Neon PostgreSQL
 
-```text
-streamlit
-mysql-connector-python
-python-dotenv
-```
+Create a free database at [Neon](https://neon.tech). Copy your connection string.
 
-## 4. Configure MySQL
+### 5. Environment Variables
 
-Create the database:
-
-```sql
-CREATE DATABASE clientdesk;
-```
-
-Then create the table using:
-
-```text
-sql/schema.sql
-```
-
-## 5. Configure Environment Variables
-
-Create a `.env` file in the project root:
+Create `.env` in the project root:
 
 ```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=YOUR_MYSQL_PASSWORD
-DB_NAME=clientdesk
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 ```
 
-Do not commit `.env` to GitHub.
+**Never commit `.env`.**
 
-## 6. Run the Application
+### 6. Run SQL Scripts
+
+Run the schema script against your Neon database:
 
 ```bash
-streamlit run app.py
+psql -d "postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f database/01_create_tables.sql
+```
+
+Then seed the products:
+
+```bash
+psql -d "postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f database/02_insert_products.sql
 ```
 
 ---
 
-# 🧪 Development Workflow
+## Usage
 
-ClientDesk is being developed incrementally:
+Launch the CLI application:
 
-```text
-Design
-  ↓
-Write Code
-  ↓
-Test
-  ↓
-Fix
-  ↓
-Understand
-  ↓
-Commit
-  ↓
-Next Feature
+```bash
+python main.py
 ```
 
-The goal is not simply to generate the entire application at once, but to understand how each component works.
+### Main Menu
 
----
-
-# 📋 Current Development Status
-
-## Foundation
-
-- [x] MySQL installed
-- [x] MySQL Workbench configured
-- [x] Database created
-- [x] Table created
-- [x] Python virtual environment created
-- [x] `mysql-connector-python` installed
-- [x] Python → MySQL connection
-- [x] `.env` configuration
-- [x] `.gitignore`
-- [x] Database connection function
-- [x] INSERT function
-- [x] SELECT function
-- [x] Username duplicate check
-- [x] Email duplicate check
-
-## Validation
-
-- [x] Full name validation
-- [x] Address validation
-- [x] Phone validation
-- [x] Username validation
-- [x] Email validation
-- [x] Password validation
-- [x] Confirm password validation
-
-## Streamlit
-
-- [x] Streamlit installed
-- [x] Basic application created
-- [x] Registration interface started
-- [ ] Complete registration flow
-- [ ] Password hashing
-- [ ] Login system
-- [ ] Session management
-
-## Customer Management
-
-- [ ] Add customer
-- [ ] View customers
-- [ ] Search customers
-- [ ] Update customer
-- [ ] Delete customer
-
-## Deployment
-
-- [ ] GitHub repository
-- [ ] Cloud MySQL
-- [ ] Streamlit Community Cloud deployment
-- [ ] Production environment configuration
-
----
-
-# 🚀 Planned V1 Features
-
-1. Registration
-2. Login
-3. Authentication
-4. Add customer
-5. View customers
-6. Search customers
-7. Update customer
-8. Delete customer
-9. Input validation
-10. Duplicate detection
-11. Password hashing
-12. Error handling
-13. Streamlit UI
-
----
-
-# 🔮 Future Improvements
-
-Possible V2 improvements:
-
-- Separate `users` and `customers` tables
-- Multiple user accounts
-- User roles
-- Admin dashboard
-- Customer ownership
-- Created/updated timestamps
-- Better search and filtering
-- Pagination
-- Advanced authentication
-- Password reset
-- Audit logs
-- Improved UI
-- Cloud database
-- Production deployment
-
-These features are intentionally outside the initial V1 scope.
-
----
-
-# 🔒 Security Considerations
-
-The project is primarily an educational application, but basic security practices are being followed.
-
-### Environment Variables
-
-Database credentials are stored in `.env`.
-
-### SQL Injection Protection
-
-Parameterized SQL queries are used:
-
-```python
-cursor.execute(
-    "SELECT * FROM cust_details WHERE user_id = %s",
-    (user_id,)
-)
+```
+MORE SUPERMARKET MEGA
+=======================
+1. Register Customer
+2. Start New Billing
+3. View Products
+4. Generate Product QR PDF
+5. Exit
 ```
 
-SQL strings should never be constructed using user input.
+### Register a Customer
 
-### Password Security
+1. Select option **1**.
+2. Enter the customer's full name, address, and 10-digit phone number.
+3. Duplicate phone numbers are rejected.
+4. On success, the customer ID is displayed.
 
-Passwords should be hashed before being stored in MySQL.
+### Start New Billing
 
-Plaintext passwords should not be stored in the database.
+1. Select option **2**.
+2. Enter the customer's 10-digit phone number.
+   - Existing customer → greeting shown.
+   - Not found → prompted to register.
+3. **Add products:**
+   - Choose `s` to scan a QR code via webcam, or `m` to enter a product ID manually.
+   - Enter the quantity.
+   - Repeat until finished.
+4. The bill is finalised atomically:
+   - Bill summary and details are saved.
+   - Inventory is deducted.
+   - If any step fails, **everything** rolls back.
+5. A formatted receipt is displayed and saved to `generated/receipt_{BILL_ID}.txt`.
 
-### Git Security
+### View Products
 
-The following files should not be committed:
+Select option **3** to see a table of all products with ID, name, price and stock.
 
-```text
-.env
-.venv/
-__pycache__/
-```
+### Generate QR PDF
 
----
-
-# 🎯 Learning Objectives
-
-This project is being developed as a practical Python + SQL learning project.
-
-### Python
-
-- Variables
-- Data types
-- Strings
-- Lists
-- Tuples
-- Sets
-- Dictionaries
-- Conditions
-- Loops
-- Functions
-- Lambda
-- Exception handling
-- Modules
-- Database connectivity
-- Input validation
-
-### SQL
-
-- Database creation
-- Table creation
-- Primary keys
-- Auto increment
-- Unique constraints
-- INSERT
-- SELECT
-- UPDATE
-- DELETE
-- WHERE
-- Parameterized queries
-- Transactions
-
-### Streamlit
-
-- Page configuration
-- Text input
-- Text area
-- Password fields
-- Buttons
-- Validation messages
-- Success/error messages
-- Application state
-- Forms
+Select option **4** to generate a printable A4 PDF (`generated/product_qr_codes.pdf`) with QR codes for every product. Each label shows the product ID, name, price and stock. Layout: 3 columns × 5 rows per page.
 
 ---
 
-# 🌐 Planned Deployment
+## QR Scanning
 
-The planned deployment architecture is:
+The scanner uses OpenCV to access the webcam. It returns the decoded QR content (the product ID) and does **not** perform any database operations.
 
-```text
-GitHub
-   ↓
-Streamlit Community Cloud
-   ↓
-Python + Streamlit Application
-   ↓
-Cloud MySQL Database
-```
-
-Development will initially use:
-
-```text
-Windows 11
-   ↓
-PyCharm
-   ↓
-Python
-   ↓
-Local MySQL
-   ↓
-MySQL Workbench
-```
-
-Cloud deployment will be handled after the local V1 is complete.
+If OpenCV is not installed or the webcam is unavailable, the application falls back to manual product-ID entry — the billing workflow works fully without a camera.
 
 ---
 
-# 📌 Project Philosophy
+## Receipt Generation
 
-ClientDesk is intentionally being built as a simple application.
+After a successful bill, a formatted receipt is:
 
-The objective is to understand the fundamentals of:
+1. Displayed in the terminal.
+2. Saved to `generated/receipt_{BILL_ID}.txt`.
 
-```text
-Python
-+
-SQL
-+
-Databases
-+
-Web UI
-+
-Application Logic
-```
+The receipt includes: store name, bill ID, customer ID, customer name, date/time, product lines (name, price, qty, total), grand total, and a thank-you message.
 
-before introducing more advanced frameworks and architecture.
-
-The project can later evolve into a more production-oriented system.
+Receipts are **only** generated for successful transactions.
 
 ---
 
-# 📄 License
+## Inventory Management
 
-This project is currently intended as a personal learning and portfolio project.
+- Stock is checked before finalising a bill.
+- Stock is deducted only **after** the bill summary and details are saved.
+- The entire billing operation runs inside a PostgreSQL transaction.
+- If any part fails (e.g., insufficient stock, database error), the transaction rolls back — no partial inserts, no phantom deductions.
+- Product rows are locked with `FOR UPDATE` during billing to prevent race conditions.
+
+---
+
+## Error Handling
+
+- Invalid menu choices → friendly message, menu redisplayed.
+- Invalid input (empty name, non-numeric ID, etc.) → caught and explained.
+- Database connection failure → caught, application exits gracefully.
+- KeyboardInterrupt (`Ctrl+C`) → clean resource release.
+- Billing errors → full rollback, user notified, no data loss.
+
+---
+
+## Testing
+
+### Static Checks
+
+```bash
+python -m compileall modules/ main.py
+```
+
+### Connection Test
+
+```bash
+python test_connection.py
+```
+
+### Customer Test
+
+```bash
+python test_customer.py
+```
+
+### Product Test
+
+```bash
+python test_product.py
+```
+
+### Billing Test
+
+```bash
+python test_billing.py
+```
+
+### QR PDF Generation Test
+
+```bash
+python test_qr_generator.py
+```
+
+### Transaction Rollback
+
+The billing test (`test_billing.py`) verifies that a failed billing operation does **not** create bill records or deduct inventory.
+
+---
+
+## Known Limitations
+
+- Webcam scanning requires a physical camera and OpenCV GUI support. In headless environments, use manual product ID entry.
+- The PDF QR label layout (3 columns × 5 rows) may require slight adjustment depending on the paper margins of your printer.
+- Customer lookup is by phone number only (no name search).
+
+---
+
+## Future Scope
+
+- Streamlit web interface (when the CLI is fully stable).
+- Email receipt delivery.
+- Customer purchase history.
+- Barcode support alongside QR codes.
+- Sales reporting and analytics.
+- Multi-user / staff login.
+
+---
+
+## License
+
+Personal learning and portfolio project.
