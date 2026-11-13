@@ -681,13 +681,9 @@ def page_qr():
     st.write(f"**{len(products)} products** will be included in the PDF.")
 
     if st.button("Generate QR PDF", type="primary"):
-        pdf_path = generate_product_qr_pdf(
-            products, Path("generated") / "product_qr_codes.pdf"
-        )
-        st.success(f"PDF generated: {pdf_path}")
-
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
+        # Generate in memory to avoid temporary files for the download.
+        pdf_bytes = generate_product_qr_pdf(products)
+        st.success("QR PDF generated successfully.")
         st.download_button(
             label="📥 Download QR PDF",
             data=pdf_bytes,
