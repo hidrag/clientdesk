@@ -1,12 +1,12 @@
 # More Supermarket Mega
 
-A complete CLI-based supermarket billing application built with Python and PostgreSQL.
+A complete supermarket billing application with a **CLI interface** and a **Streamlit web interface**, built with Python and PostgreSQL.
 
 ---
 
 ## Project Overview
 
-More Supermarket Mega is a QR-code-based supermarket billing system designed as a Python learning and portfolio project. It covers database connectivity, customer management, product inventory, QR code generation and scanning, transactional billing, and receipt generation — all from the terminal.
+More Supermarket Mega is a QR-code-based supermarket billing system designed as a Python learning and portfolio project. It covers database connectivity, customer management, product inventory, QR code generation and scanning, transactional billing, and receipt generation — available both from the terminal and through a web browser.
 
 ### Objectives
 
@@ -14,7 +14,8 @@ More Supermarket Mega is a QR-code-based supermarket billing system designed as 
 - Work with PostgreSQL for persistent data storage.
 - Use parameterized queries and transactions for data integrity.
 - Integrate QR code generation and webcam scanning.
-- Build a complete CLI workflow from customer identification through bill finalisation.
+- Build a complete billing workflow from customer identification through bill finalisation.
+- Demonstrate the same business logic through both CLI and web interfaces.
 
 ---
 
@@ -24,13 +25,14 @@ More Supermarket Mega is a QR-code-based supermarket billing system designed as 
 |---|---|
 | Customer registration | Collect name, address and phone; validate; prevent duplicate phone numbers |
 | Customer lookup | Find customers by phone number |
-| Product catalogue | View all products with ID, name, price and stock |
+| Product catalogue | View all products with ID, name, price and stock; search by name |
 | QR code PDF generation | Generate a printable A4 PDF with QR codes for every product |
 | QR code scanning | Scan product QR codes via webcam (OpenCV); manual ID fallback |
 | Billing | Build a cart, lock inventory, save bill summary + details atomically |
 | Receipt generation | Display a formatted receipt and save it as a `.txt` file |
 | Inventory deduction | Stock is decremented only after a successful bill |
 | Transaction safety | Failed bills roll back completely — no partial inserts or stock changes |
+| Web interface | Streamlit dashboard, customer management, product catalogue, cart, receipt download |
 
 ---
 
@@ -45,33 +47,40 @@ More Supermarket Mega is a QR-code-based supermarket billing system designed as 
 | `qrcode[pil]` | QR code image generation |
 | ReportLab (`reportlab`) | PDF generation for product labels |
 | `python-dotenv` | Environment variable management |
+| Streamlit | Web user interface |
 
 ---
 
 ## Architecture
 
 ```
-User
-  ↓
-CLI Menu (main.py)
-  ↓
-┌─── modules/ ──────────────────┐
-│  db_connection.py  → PostgreSQL │
-│  customer.py       → CRUD ops   │
-│  product.py        → queries    │
-│  billing.py        → tx logic   │
-│  receipt.py        → formatting │
-│  qr_generator.py   → PDF        │
-│  qr_scanner.py     → webcam     │
-│  validation.py     → input      │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    More Supermarket Mega                        │
+├─────────────────────────────────────────────────────────────────┤
+│  CLI (main.py)                    Streamlit (streamlit_app.py)  │
+│       │                                    │                    │
+│       └──────────────┬─────────────────────┘                    │
+│                      ▼                                          │
+│           ┌─────────────────────────┐                           │
+│           │       modules/          │                           │
+│           │  db_connection.py       │  →  PostgreSQL            │
+│           │  customer.py            │  →  CRUD ops              │
+│           │  product.py             │  →  queries               │
+│           │  billing.py             │  →  tx logic              │
+│           │  receipt.py             │  →  formatting            │
+│           │  qr_generator.py        │  →  PDF                  │
+│           │  qr_scanner.py          │  →  webcam               │
+│           │  validation.py          │  →  input                │
+│           └─────────────────────────┘                           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Folder Structure
 
 ```
-ClientDesk/
+MoreSupermarketMega/
 ├── main.py                   # CLI entry point
+├── streamlit_app.py          # Streamlit web entry point
 ├── modules/
 │   ├── __init__.py
 │   ├── billing.py
@@ -192,7 +201,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 
 **Never commit `.env`.**
 
-### 6. Run SQL Scripts
+### 6. Run SQL Scripts (First Time Only)
 
 Run the schema script against your Neon database:
 
@@ -210,13 +219,13 @@ psql -d "postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f database/02_
 
 ## Usage
 
-Launch the CLI application:
+### Launch the CLI Application
 
 ```bash
 python main.py
 ```
 
-### Main Menu
+#### Main Menu
 
 ```
 MORE SUPERMARKET MEGA
@@ -228,36 +237,43 @@ MORE SUPERMARKET MEGA
 5. Exit
 ```
 
+### Launch the Streamlit Web Application
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Then open the URL shown in the terminal (typically `http://localhost:8501`).
+
+#### Streamlit Pages
+
+| Page | Description |
+|---|---|
+| **Dashboard** | Overview with product/customer counts and navigation |
+| **Customer Management** | Lookup by phone, register new customers, view all customers |
+| **Products** | Browse product catalogue with search, look up by ID |
+| **Billing** | Full cart workflow: customer selection, product entry, checkout, receipt |
+| **QR Code Generation** | Generate and download the product QR PDF |
+
 ### Register a Customer
 
-1. Select option **1**.
-2. Enter the customer's full name, address, and 10-digit phone number.
-3. Duplicate phone numbers are rejected.
-4. On success, the customer ID is displayed.
+1. **CLI:** Select option **1**, enter name, address, phone.
+2. **Web:** Go to **Customer Management**, search or use the registration form.
 
 ### Start New Billing
 
-1. Select option **2**.
-2. Enter the customer's 10-digit phone number.
-   - Existing customer → greeting shown.
-   - Not found → prompted to register.
-3. **Add products:**
-   - Choose `s` to scan a QR code via webcam, or `m` to enter a product ID manually.
-   - Enter the quantity.
-   - Repeat until finished.
-4. The bill is finalised atomically:
-   - Bill summary and details are saved.
-   - Inventory is deducted.
-   - If any step fails, **everything** rolls back.
-5. A formatted receipt is displayed and saved to `generated/receipt_{BILL_ID}.txt`.
+1. **CLI:** Select option **2**, enter phone number, add products via QR scan or manual ID, finalise.
+2. **Web:** Go to **Billing**, enter phone number, add products by ID with quantity, review cart, click **Finalize Bill**.
 
 ### View Products
 
-Select option **3** to see a table of all products with ID, name, price and stock.
+- **CLI:** Select option **3**.
+- **Web:** Go to **Products**.
 
 ### Generate QR PDF
 
-Select option **4** to generate a printable A4 PDF (`generated/product_qr_codes.pdf`) with QR codes for every product. Each label shows the product ID, name, price and stock. Layout: 3 columns × 5 rows per page.
+- **CLI:** Select option **4**.
+- **Web:** Go to **QR Code Generation** and click **Generate QR PDF**.
 
 ---
 
@@ -267,14 +283,16 @@ The scanner uses OpenCV to access the webcam. It returns the decoded QR content 
 
 If OpenCV is not installed or the webcam is unavailable, the application falls back to manual product-ID entry — the billing workflow works fully without a camera.
 
+In the Streamlit interface, only manual product-ID entry is available (browser camera integration may be added in a future version).
+
 ---
 
 ## Receipt Generation
 
 After a successful bill, a formatted receipt is:
 
-1. Displayed in the terminal.
-2. Saved to `generated/receipt_{BILL_ID}.txt`.
+1. **CLI:** Displayed in the terminal and saved to `generated/receipt_{BILL_ID}.txt`.
+2. **Web:** Displayed on the billing page with a **Download Receipt** button.
 
 The receipt includes: store name, bill ID, customer ID, customer name, date/time, product lines (name, price, qty, total), grand total, and a thank-you message.
 
@@ -294,11 +312,10 @@ Receipts are **only** generated for successful transactions.
 
 ## Error Handling
 
-- Invalid menu choices → friendly message, menu redisplayed.
-- Invalid input (empty name, non-numeric ID, etc.) → caught and explained.
+- Invalid menu choices / input → friendly message, no crash.
 - Database connection failure → caught, application exits gracefully.
-- KeyboardInterrupt (`Ctrl+C`) → clean resource release.
 - Billing errors → full rollback, user notified, no data loss.
+- Cart is preserved across Streamlit reruns; cleared only after successful checkout.
 
 ---
 
@@ -307,7 +324,13 @@ Receipts are **only** generated for successful transactions.
 ### Static Checks
 
 ```bash
-python -m compileall modules/ main.py
+python -m compileall modules/ main.py streamlit_app.py
+```
+
+### Unit Tests (No Database Required)
+
+```bash
+python tests/test_unit.py
 ```
 
 ### Connection Test
@@ -349,6 +372,7 @@ The billing test (`test_billing.py`) verifies that a failed billing operation do
 ## Known Limitations
 
 - Webcam scanning requires a physical camera and OpenCV GUI support. In headless environments, use manual product ID entry.
+- The Streamlit interface does not include browser-based QR scanning (manual ID entry is the fallback).
 - The PDF QR label layout (3 columns × 5 rows) may require slight adjustment depending on the paper margins of your printer.
 - Customer lookup is by phone number only (no name search).
 
@@ -356,7 +380,7 @@ The billing test (`test_billing.py`) verifies that a failed billing operation do
 
 ## Future Scope
 
-- Streamlit web interface (when the CLI is fully stable).
+- Browser-based QR scanning via `st.camera_input`.
 - Email receipt delivery.
 - Customer purchase history.
 - Barcode support alongside QR codes.
